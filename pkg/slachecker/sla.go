@@ -73,32 +73,22 @@ func (s SLA) calculateWorkingTimeRemaining(startTime, endTime time.Time) string 
 	currentTime := startTime
 
 	for currentTime.Before(endTime) {
-		// Check if it's a valid business day and hour
 		if s.isValidDay(currentTime) && s.isWithinBusinessHours(currentTime) && !s.isHoliday(currentTime) {
-			// Calculate the end of the current business day
-			endOfBusinessDay := time.Date(
-				currentTime.Year(),
-				currentTime.Month(),
-				currentTime.Day(),
-				s.BusinessHours.EndHour,
-				0, 0, 0, location,
-			)
-
-			// Ensure the end of the business day does not exceed the SLA end time
+			// End of the business day
+			endOfBusinessDay := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), s.BusinessHours.EndHour, 0, 0, 0, location)
 			if endOfBusinessDay.After(endTime) {
 				endOfBusinessDay = endTime
 			}
 
-			// Add only the remaining time within business hours for this day
+			// Add only the remaining business hours of the current day
 			if endOfBusinessDay.After(currentTime) {
 				remainingDuration += endOfBusinessDay.Sub(currentTime)
 			}
 
-			// Move currentTime to the end of the business day (or endTime if it's earlier)
 			currentTime = endOfBusinessDay
 		}
 
-		// Move to the start of the next business day if we are outside business hours
+		// Move to the start of the next business day
 		currentTime = s.moveToNextBusinessDay(currentTime)
 	}
 
