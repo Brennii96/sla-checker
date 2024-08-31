@@ -1,6 +1,9 @@
 package slachecker
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type SLA struct {
 	StartTime     time.Time
@@ -14,6 +17,14 @@ type SLA struct {
 	Holidays  []time.Time    // Specific holidays when SLA is not applicable
 }
 
+// SLAResult contains the details about SLA status
+type SLAResult struct {
+	IsWithinSLA bool      `json:"isWithinSLA"`
+	Deadline    time.Time `json:"deadline"`
+	Remaining   string    `json:"remaining"`
+	Overage     string    `json:"overage,omitempty"`
+}
+
 // IsWithinSLA checks if the current time is within the SLA duration from the start time.
 func (s SLA) IsWithinSLA(currentTime time.Time) bool {
 	// Calculate the SLA deadline based on business hours, weekends, and holidays
@@ -21,6 +32,32 @@ func (s SLA) IsWithinSLA(currentTime time.Time) bool {
 
 	// Check if the current time is before the calculated SLA deadline
 	return currentTime.Before(slaDeadline)
+}
+
+// CheckSLA checks if the current time is within the SLA duration and returns additional details
+func (s SLA) CheckSLA(currentTime time.Time) SLAResult {
+	// Calculate the SLA deadline based on business hours, weekends, and holidays
+	slaDeadline := s.calculateSLADeadline()
+
+	// Calculate the time difference
+	timeRemaining := slaDeadline.Sub(currentTime)
+	isWithinSLA := currentTime.Before(slaDeadline)
+
+	var overage time.Duration
+	if !isWithinSLA {
+		overage = currentTime.Sub(slaDeadline)
+	}
+
+	// Convert durations to readable strings
+	remainingStr := formatDuration(timeRemaining)
+	overageStr := formatDuration(overage)
+
+	return SLAResult{
+		IsWithinSLA: isWithinSLA,
+		Deadline:    slaDeadline,
+		Remaining:   remainingStr,
+		Overage:     overageStr,
+	}
 }
 
 // calculateSLADeadline calculates the SLA deadline based on business hours, weekends, and holidays
@@ -33,8 +70,12 @@ func (s SLA) calculateSLADeadline() time.Time {
 	for remainingDuration > 0 {
 		// If it's a valid business day and hour, reduce the remaining SLA time
 		if s.isValidDay(currentTime) && s.isWithinBusinessHours(currentTime) && !s.isHoliday(currentTime) {
-			// Move forward by one hour and reduce remaining SLA time accordingly
-			remainingDuration -= time.Hour
+			// Reduce remaining SLA time by one hour
+			if remainingDuration >= time.Hour {
+				remainingDuration -= time.Hour
+			} else {
+				break
+			}
 		}
 
 		// Move forward one hour to the next time slot
@@ -47,6 +88,17 @@ func (s SLA) calculateSLADeadline() time.Time {
 	}
 
 	return currentTime
+}
+
+// formatDuration converts time.Duration to a human-readable format
+func formatDuration(d time.Duration) string {
+	if d < 0 {
+		d = -d
+	}
+	hours := int(d.Hours())
+	minutes := int(d.Minutes()) % 60
+	seconds := int(d.Seconds()) % 60
+	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
 }
 
 // moveToNextBusinessDay moves the given time to the start of the next business day
