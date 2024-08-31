@@ -19,10 +19,11 @@ type SLA struct {
 
 // SLAResult contains the details about SLA status
 type SLAResult struct {
-	IsWithinSLA bool      `json:"isWithinSLA"`
-	Deadline    time.Time `json:"deadline"`
-	Remaining   string    `json:"remaining"`
-	Overage     string    `json:"overage,omitempty"`
+	IsWithinSLA          bool      `json:"isWithinSLA"`
+	Deadline             time.Time `json:"deadline"`
+	Remaining            string    `json:"remaining"`
+	Overage              string    `json:"overage,omitempty"`
+	WorkingTimeRemaining string    `json:"workingTimeRemaining"`
 }
 
 // IsWithinSLA checks if the current time is within the SLA duration from the start time.
@@ -48,16 +49,48 @@ func (s SLA) CheckSLA(currentTime time.Time) SLAResult {
 		overage = currentTime.Sub(slaDeadline)
 	}
 
+	// Calculate working time remaining
+	workingTimeRemaining := s.calculateWorkingTimeRemaining(currentTime, slaDeadline)
+
 	// Convert durations to readable strings
 	remainingStr := formatDuration(timeRemaining)
 	overageStr := formatDuration(overage)
 
 	return SLAResult{
-		IsWithinSLA: isWithinSLA,
-		Deadline:    slaDeadline,
-		Remaining:   remainingStr,
-		Overage:     overageStr,
+		IsWithinSLA:          isWithinSLA,
+		Deadline:             slaDeadline,
+		Remaining:            remainingStr,
+		Overage:              overageStr,
+		WorkingTimeRemaining: workingTimeRemaining,
 	}
+}
+
+// calculateWorkingTimeRemaining calculates the remaining working time considering business hours and days
+func (s SLA) calculateWorkingTimeRemaining(startTime, endTime time.Time) string {
+	remainingDuration := time.Duration(0)
+
+	currentTime := startTime
+
+	for currentTime.Before(endTime) {
+		if s.isValidDay(currentTime) && s.isWithinBusinessHours(currentTime) && !s.isHoliday(currentTime) {
+			// End of the business day
+			endOfBusinessDay := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), s.BusinessHours.EndHour, 0, 0, 0, time.Local)
+			if endOfBusinessDay.After(endTime) {
+				endOfBusinessDay = endTime
+			}
+
+			if endOfBusinessDay.After(currentTime) {
+				remainingDuration += endOfBusinessDay.Sub(currentTime)
+			}
+
+			currentTime = endOfBusinessDay
+		}
+
+		// Move to the start of the next business day
+		currentTime = s.moveToNextBusinessDay(currentTime)
+	}
+
+	return formatDuration(remainingDuration)
 }
 
 // calculateSLADeadline calculates the SLA deadline based on business hours, weekends, and holidays
