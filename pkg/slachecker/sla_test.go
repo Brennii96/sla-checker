@@ -5,6 +5,39 @@ import (
 	"time"
 )
 
+func TestCalculateWorkingTimeRemaining(t *testing.T) {
+	// Define the SLA with the test scenario
+	sla := SLA{
+		StartTime: time.Date(2024, time.August, 30, 16, 0, 0, 0, time.UTC), // 4:00 PM on Friday
+		SLALength: 4,                                                       // 4 hours SLA
+		TimeUnit:  "hours",
+		BusinessHours: struct {
+			StartHour int
+			EndHour   int
+		}{
+			StartHour: 9,  // Business hours start at 9:00 AM
+			EndHour:   17, // Business hours end at 5:00 PM
+		},
+		ValidDays: []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday},
+		Holidays:  []time.Time{}, // No holidays for simplicity
+	}
+
+	// Define the current time: 1 hour has passed on Friday (2024-08-30T17:00:00Z)
+	currentTime := time.Date(2024, time.August, 30, 17, 0, 0, 0, time.UTC) // 5:00 PM on Friday
+
+	// Define the expected result: 3 hours of working time should remain
+	expectedWorkingTimeRemaining := "03:00:00"
+
+	// Call the calculateWorkingTimeRemaining function
+	endTime := sla.calculateSLADeadline() // The deadline calculated from the SLA
+	workingTimeRemaining := sla.calculateWorkingTimeRemaining(currentTime, endTime)
+
+	// Check if the result matches the expected value
+	if workingTimeRemaining != expectedWorkingTimeRemaining {
+		t.Errorf("Expected workingTimeRemaining to be %s, but got %s", expectedWorkingTimeRemaining, workingTimeRemaining)
+	}
+}
+
 func TestIsWithinSLA(t *testing.T) {
 	// Define common SLA configuration for the tests
 	sla := SLA{
