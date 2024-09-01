@@ -54,8 +54,16 @@ func (s SLA) CheckSLA(currentTime time.Time) SLAResult {
 			Overage:     "N/A",
 		}
 	}
+
+	// Initialize timeRemaining
+	var timeRemaining time.Duration
+	fmt.Println(timeRemaining)
+
 	// Calculate the time difference
-	timeRemaining := slaDeadline.Sub(currentTime)
+	if currentTime.Before(slaDeadline) {
+		timeRemaining = slaDeadline.Sub(currentTime)
+	}
+
 	isWithinSLA := currentTime.Before(slaDeadline)
 
 	var overage time.Duration
@@ -86,7 +94,7 @@ func (s SLA) calculateWorkingTimeRemaining(startTime, endTime time.Time) string 
 
 	// Use pure functional iteration
 	for currentTime.Before(endTime) {
-		if s.isValidDay(currentTime) && s.isWithinBusinessHours(currentTime) && !s.isHoliday(currentTime) {
+		if s.isBusinessTime(currentTime) {
 			// Calculate the end of the current business day
 			endOfBusinessDay := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), s.BusinessHours.EndHour, 0, 0, 0, time.UTC)
 
@@ -115,6 +123,10 @@ func (s SLA) calculateWorkingTimeRemaining(startTime, endTime time.Time) string 
 	return formatDuration(remainingDuration)
 }
 
+func (s *SLA) isBusinessTime(t time.Time) bool {
+	return s.isValidDay(t) && s.isWithinBusinessHours(t) && !s.isHoliday(t)
+}
+
 // calculateSLADeadline calculates the SLA deadline based on business hours, weekends, and holidays
 func (s SLA) calculateSLADeadline() (time.Time, error) {
 	remainingDuration, err := s.getSLADuration()
@@ -127,7 +139,7 @@ func (s SLA) calculateSLADeadline() (time.Time, error) {
 
 	for remainingDuration > 0 {
 		// If it's a valid business day and hour, reduce the remaining SLA time
-		if s.isValidDay(currentTime) && s.isWithinBusinessHours(currentTime) && !s.isHoliday(currentTime) {
+		if s.isBusinessTime(currentTime) {
 			// Reduce remaining SLA time by one hour
 			if remainingDuration >= time.Hour {
 				remainingDuration -= time.Hour
@@ -153,10 +165,7 @@ func formatDuration(d time.Duration) string {
 	if d < 0 {
 		d = -d
 	}
-	hours := int(d.Hours())
-	minutes := int(d.Minutes()) % 60
-	seconds := int(d.Seconds()) % 60
-	return fmt.Sprintf("%02d:%02d:%02d", hours, minutes, seconds)
+	return fmt.Sprintf("%02d:%02d:%02d", int(d.Hours()), int(d.Minutes())%60, int(d.Seconds())%60)
 }
 
 // moveToNextBusinessDay moves the given time to the start of the next business day
