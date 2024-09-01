@@ -31,7 +31,7 @@ cd into your project and init the module.
 ```
 ## Usage/Examples
 
-The holidays modules is using the Date.nager.at API to get public holidays for a given year and country code.
+The holidays modules is using the [Date.nager.at]((https://github.com/nager/Nager.Date)) API to get public holidays for a given year and country code.
 
 Import the required modules
 ```go
