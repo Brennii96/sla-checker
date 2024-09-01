@@ -21,16 +21,6 @@ The `slachecker` package allows you to manage and evaluate Service Level Agreeme
   - `CheckSLA(currentTime time.Time) SLAResult`
 
 
-
-## License
-
-[MIT](./LICENSE.txt)
-
-
-# SLA Checker
-
-
-
 ## Installation
 
 cd into your project and init the module.
@@ -138,3 +128,8 @@ type SLAResult struct {
 	WorkingTimeRemaining string    `json:"workingTimeRemaining"`
 }
 ```
+
+
+## License
+
+[MIT](./LICENSE.txt)
