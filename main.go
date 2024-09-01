@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"time"
@@ -10,7 +11,7 @@ import (
 )
 
 func main() {
-	holidays, err := holidays.FetchHolidays(2024, "GB")
+	fetchedHolidays, err := holidays.FetchHolidays(2024, "GB")
 	if err != nil {
 		log.Fatalf("Error fetching holidays: %v", err)
 	}
@@ -22,7 +23,14 @@ func main() {
 	slaLength := 4
 	timeUnit := "hours" // SLA length of 4 hours
 
-	// Define the SLA configuration
+	var validDays []time.Weekday
+
+	validDays = append(validDays, time.Monday)
+	validDays = append(validDays, time.Tuesday)
+	validDays = append(validDays, time.Wednesday)
+	validDays = append(validDays, time.Thursday)
+	validDays = append(validDays, time.Friday)
+
 	sla := slachecker.SLA{
 		StartTime: startTime,
 		SLALength: slaLength,
@@ -30,18 +38,23 @@ func main() {
 		BusinessHours: struct {
 			StartHour int
 			EndHour   int
-		}{StartHour: 9, EndHour: 17},
-		ValidDays: []time.Weekday{time.Monday, time.Tuesday, time.Wednesday, time.Thursday, time.Friday},
-		Holidays:  holidays,
+		}{
+			StartHour: 9,
+			EndHour:   17,
+		},
+		ValidDays: validDays,
+		Holidays:  fetchedHolidays,
 	}
 
 	// Current time is Monday, September 2nd, 2024 at 12:00 UTC
-	currentTime := time.Now()
+	currentTime := time.Now().UTC()
 
-	// Check if the current time is within the SLA
-	if sla.IsWithinSLA(currentTime) {
-		fmt.Println("The current time is within the SLA")
-	} else {
-		fmt.Println("The current time is not within the SLA")
+	result := sla.CheckSLA(currentTime)
+	jsonData, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		fmt.Println("Error marshaling JSON:", err)
+		return
 	}
+
+	fmt.Println(string(jsonData))
 }

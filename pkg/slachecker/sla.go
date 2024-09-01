@@ -29,7 +29,12 @@ type SLAResult struct {
 // IsWithinSLA checks if the current time is within the SLA duration from the start time.
 func (s SLA) IsWithinSLA(currentTime time.Time) bool {
 	// Calculate the SLA deadline based on business hours, weekends, and holidays
-	slaDeadline := s.calculateSLADeadline()
+	slaDeadline, err := s.calculateSLADeadline()
+	if err != nil {
+		// Handle the error (log it, return a special SLA result, etc.)
+		fmt.Println("Error calculating SLA deadline:", err)
+		return false
+	}
 
 	// Check if the current time is before the calculated SLA deadline
 	return currentTime.Before(slaDeadline)
@@ -38,8 +43,17 @@ func (s SLA) IsWithinSLA(currentTime time.Time) bool {
 // CheckSLA checks if the current time is within the SLA duration and returns additional details
 func (s SLA) CheckSLA(currentTime time.Time) SLAResult {
 	// Calculate the SLA deadline based on business hours, weekends, and holidays
-	slaDeadline := s.calculateSLADeadline()
-
+	slaDeadline, err := s.calculateSLADeadline()
+	if err != nil {
+		// Handle the error (log it, return a special SLA result, etc.)
+		fmt.Println("Error calculating SLA deadline:", err)
+		return SLAResult{
+			IsWithinSLA: false,
+			Deadline:    time.Time{},
+			Remaining:   "N/A",
+			Overage:     "N/A",
+		}
+	}
 	// Calculate the time difference
 	timeRemaining := slaDeadline.Sub(currentTime)
 	isWithinSLA := currentTime.Before(slaDeadline)
@@ -68,28 +82,32 @@ func (s SLA) CheckSLA(currentTime time.Time) SLAResult {
 // calculateWorkingTimeRemaining calculates the remaining working time considering business hours and days
 func (s SLA) calculateWorkingTimeRemaining(startTime, endTime time.Time) string {
 	remainingDuration := time.Duration(0)
-	location := startTime.Location()
 	currentTime := startTime
 
+	// Use pure functional iteration
 	for currentTime.Before(endTime) {
 		if s.isValidDay(currentTime) && s.isWithinBusinessHours(currentTime) && !s.isHoliday(currentTime) {
-			// Calculate the end of the business day
-			endOfBusinessDay := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), s.BusinessHours.EndHour, 0, 0, 0, location)
+			// Calculate the end of the current business day
+			endOfBusinessDay := time.Date(currentTime.Year(), currentTime.Month(), currentTime.Day(), s.BusinessHours.EndHour, 0, 0, 0, time.UTC)
+
+			adjustedStartTime := time.Date(
+				endOfBusinessDay.Year(),
+				endOfBusinessDay.Month(),
+				endOfBusinessDay.Day(),
+				s.BusinessHours.StartHour, 0, 0, 0,
+				endOfBusinessDay.Location(),
+			)
+
+			// If the end of business day exceeds the endTime, adjust it
 			if endOfBusinessDay.After(endTime) {
 				endOfBusinessDay = endTime
 			}
 
-			// Add the remaining business hours for the current day
-			if endOfBusinessDay.After(currentTime) {
-				remainingDuration += endOfBusinessDay.Sub(currentTime)
-			}
+			remainingDuration += endOfBusinessDay.Sub(adjustedStartTime)
 
-			// Move to the end of the business day
 			currentTime = endOfBusinessDay
-		}
-
-		// Move to the start of the next business day if current time is after business hours
-		if !s.isWithinBusinessHours(currentTime) {
+		} else {
+			// Move to the next valid business day
 			currentTime = s.moveToNextBusinessDay(currentTime)
 		}
 	}
@@ -98,8 +116,11 @@ func (s SLA) calculateWorkingTimeRemaining(startTime, endTime time.Time) string 
 }
 
 // calculateSLADeadline calculates the SLA deadline based on business hours, weekends, and holidays
-func (s SLA) calculateSLADeadline() time.Time {
-	remainingDuration := s.getSLADuration()
+func (s SLA) calculateSLADeadline() (time.Time, error) {
+	remainingDuration, err := s.getSLADuration()
+	if err != nil {
+		return time.Time{}, err // Propagate the error
+	}
 
 	// Start from the initial SLA start time
 	currentTime := s.StartTime
@@ -124,7 +145,7 @@ func (s SLA) calculateSLADeadline() time.Time {
 		}
 	}
 
-	return currentTime
+	return currentTime, nil
 }
 
 // formatDuration converts time.Duration to a human-readable format
@@ -153,18 +174,18 @@ func (s SLA) moveToNextBusinessDay(t time.Time) time.Time {
 }
 
 // getSLADuration converts the SLA length and time unit into a time.Duration
-func (s SLA) getSLADuration() time.Duration {
+func (s SLA) getSLADuration() (time.Duration, error) {
 	switch s.TimeUnit {
 	case "seconds":
-		return time.Duration(s.SLALength) * time.Second
+		return time.Duration(s.SLALength) * time.Second, nil
 	case "minutes":
-		return time.Duration(s.SLALength) * time.Minute
+		return time.Duration(s.SLALength) * time.Minute, nil
 	case "hours":
-		return time.Duration(s.SLALength) * time.Hour
+		return time.Duration(s.SLALength) * time.Hour, nil
 	case "days":
-		return time.Duration(s.SLALength) * 24 * time.Hour
+		return time.Duration(s.SLALength) * 24 * time.Hour, nil
 	default:
-		return 0
+		return 0, fmt.Errorf("invalid time unit: %s", s.TimeUnit)
 	}
 }
 
