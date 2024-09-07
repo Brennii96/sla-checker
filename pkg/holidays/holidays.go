@@ -5,9 +5,13 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/brennii96/sla-checker/pkg/cache"
 )
 
-// HolidayAPIResponse represents the structure of the response from Date.nager.at API
+var APIBaseURL = "https://date.nager.at/Api/v3/PublicHolidays"
+
+// Holiday represents the structure of the response from Date.nager.at API.
 type Holiday struct {
 	Date        string `json:"date"`
 	LocalName   string `json:"localName"`
@@ -15,10 +19,21 @@ type Holiday struct {
 	CountryCode string `json:"countryCode"`
 }
 
-// FetchHolidays dynamically fetches holidays for Germany and a specific year
-func FetchHolidays(year int, countryCode string) ([]time.Time, error) {
-	url := fmt.Sprintf("https://date.nager.at/Api/v3/PublicHolidays/%d/%s", year, countryCode)
+// Cache instance for holidays.
+var holidayCache = cache.NewCache[[]time.Time](24 * 7 * time.Hour) // 1 Week TTL
 
+// FetchHolidays dynamically fetches holidays for a specific year and country code,
+// and caches the result to avoid redundant API calls.
+func FetchHolidays(year int, countryCode string) ([]time.Time, error) {
+	cacheKey := fmt.Sprintf("%d_%s", year, countryCode)
+
+	// Try to get holidays from cache.
+	if holidays, found := holidayCache.Get(cacheKey); found {
+		return holidays, nil
+	}
+
+	// If not found in cache, fetch holidays from the API.
+	url := fmt.Sprintf("%s/%d/%s", APIBaseURL, year, countryCode)
 	resp, err := http.Get(url)
 	if err != nil {
 		return nil, err
@@ -43,6 +58,9 @@ func FetchHolidays(year int, countryCode string) ([]time.Time, error) {
 		}
 		holidays = append(holidays, date)
 	}
+
+	// Store the fetched holidays in the cache.
+	holidayCache.Set(cacheKey, holidays)
 
 	return holidays, nil
 }
