@@ -111,8 +111,9 @@ type SLA struct {
 		StartHour int
 		EndHour   int
 	}
-	ValidDays []time.Weekday // e.g., []time.Weekday{time.Monday, time.Tuesday, ...}
-	Holidays  []time.Time    // Specific holidays when SLA is not applicable
+	ValidDays      []time.Weekday // e.g., []time.Weekday{time.Monday, time.Tuesday, ...}
+	Holidays       []time.Time    // Specific holidays when SLA is not applicable
+	IgnoreHolidays bool           // Should holidays be taking into account when calculating SLAs
 }
 ```
 
