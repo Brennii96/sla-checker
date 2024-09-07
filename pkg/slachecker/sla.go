@@ -13,8 +13,9 @@ type SLA struct {
 		StartHour int
 		EndHour   int
 	}
-	ValidDays []time.Weekday // e.g., []time.Weekday{time.Monday, time.Tuesday, ...}
-	Holidays  []time.Time    // Specific holidays when SLA is not applicable
+	ValidDays      []time.Weekday // e.g., []time.Weekday{time.Monday, time.Tuesday, ...}
+	Holidays       []time.Time    // Specific holidays when SLA is not applicable
+	IgnoreHolidays bool           // Should holidays be taking into account when calculating SLAs
 }
 
 // SLAResult contains the details about SLA status
@@ -216,6 +217,9 @@ func (s SLA) isWithinBusinessHours(t time.Time) bool {
 
 // isHoliday checks if the given time falls on a holiday
 func (s SLA) isHoliday(t time.Time) bool {
+	if s.IgnoreHolidays {
+		return false
+	}
 	for _, holiday := range s.Holidays {
 		if t.Year() == holiday.Year() && t.YearDay() == holiday.YearDay() {
 			return true

@@ -212,3 +212,45 @@ func TestCheckSLAWithHolidays(t *testing.T) {
 		}
 	}
 }
+
+func TestCalculateWorkingTimeIgnoringHolidays(t *testing.T) {
+	// Define holidays (which will be ignored)
+	holidays := []time.Time{
+		time.Date(2024, time.September, 2, 0, 0, 0, 0, time.UTC), // Holiday on September 2, 2024
+	}
+
+	// Define the SLA, ignoring holidays
+	sla := setupSLAWithHolidays(holidays)
+	sla.IgnoreHolidays = true
+
+	// Define the start time: Monday, September 2, 2024, at 9:00 AM
+	sla.StartTime = time.Date(2024, time.September, 2, 9, 0, 0, 0, time.UTC)
+	sla.SLALength = 4 // SLA length is 4 hours
+	sla.TimeUnit = "hours"
+
+	// Define the current time: Monday, September 2, 2024, at 11:00 AM
+	currentTime := time.Date(2024, time.September, 2, 11, 0, 0, 0, time.UTC)
+
+	// Expected results
+	expectedDeadline := time.Date(2024, time.September, 2, 13, 0, 0, 0, time.UTC) // Deadline should be 1:00 PM
+	expectedIsWithinSLA := true
+	expectedRemaining := "02:00:00" // 2 hours remaining
+	expectedOverage := "00:00:00"   // No overage
+
+	// Run the CheckSLA method
+	result := sla.CheckSLA(currentTime)
+
+	// Validate the results
+	if result.IsWithinSLA != expectedIsWithinSLA {
+		t.Errorf("Expected IsWithinSLA to be %v, but got %v", expectedIsWithinSLA, result.IsWithinSLA)
+	}
+	if !result.Deadline.Equal(expectedDeadline) {
+		t.Errorf("Expected deadline to be %v, but got %v", expectedDeadline, result.Deadline)
+	}
+	if result.Remaining != expectedRemaining {
+		t.Errorf("Expected remaining time to be %v, but got %v", expectedRemaining, result.Remaining)
+	}
+	if result.Overage != expectedOverage {
+		t.Errorf("Expected overage time to be %v, but got %v", expectedOverage, result.Overage)
+	}
+}
