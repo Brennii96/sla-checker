@@ -1,6 +1,7 @@
 package slachecker
 
 import (
+	"errors"
 	"fmt"
 	"time"
 )
@@ -27,8 +28,58 @@ type SLAResult struct {
 	WorkingTimeRemaining string    `json:"workingTimeRemaining"`
 }
 
+// Validate checks if the SLA configuration is valid
+func (s *SLA) Validate() error {
+	// Validate SLALength
+	if s.SLALength <= 0 {
+		return errors.New("SLA length must be greater than zero")
+	}
+
+	// Validate TimeUnit
+	validTimeUnits := map[string]bool{
+		"seconds": true, "minutes": true, "hours": true, "days": true,
+	}
+	if !validTimeUnits[s.TimeUnit] {
+		return errors.New("invalid time unit: " + s.TimeUnit)
+	}
+
+	// Validate BusinessHours
+	if s.BusinessHours.StartHour < 0 || s.BusinessHours.StartHour >= 24 {
+		return errors.New("business start hour must be between 0 and 23")
+	}
+	if s.BusinessHours.EndHour <= s.BusinessHours.StartHour || s.BusinessHours.EndHour > 24 {
+		return errors.New("business end hour must be greater than start hour and less than or equal to 24")
+	}
+
+	// Validate ValidDays
+	if len(s.ValidDays) == 0 {
+		return errors.New("valid days cannot be empty")
+	}
+	for _, day := range s.ValidDays {
+		if day < time.Sunday || day > time.Saturday {
+			return errors.New("invalid day in valid days")
+		}
+	}
+
+	// Validate Holidays (optional, as holidays are valid dates)
+	for _, holiday := range s.Holidays {
+		if holiday.IsZero() {
+			return errors.New("invalid holiday date")
+		}
+	}
+
+	// Return nil if all validations pass
+	return nil
+}
+
 // IsWithinSLA checks if the current time is within the SLA duration from the start time.
 func (s SLA) IsWithinSLA(currentTime time.Time) bool {
+	// Validate SLA configuration
+	if err := s.Validate(); err != nil {
+		fmt.Println("Validation error:", err)
+		return false
+	}
+
 	// Calculate the SLA deadline based on business hours, weekends, and holidays
 	slaDeadline, err := s.calculateSLADeadline()
 	if err != nil {
@@ -43,6 +94,17 @@ func (s SLA) IsWithinSLA(currentTime time.Time) bool {
 
 // CheckSLA checks if the current time is within the SLA duration and returns additional details
 func (s SLA) CheckSLA(currentTime time.Time) SLAResult {
+	// Validate SLA configuration
+	if err := s.Validate(); err != nil {
+		fmt.Println("Validation error:", err)
+		return SLAResult{
+			IsWithinSLA: false,
+			Deadline:    time.Time{},
+			Remaining:   "N/A",
+			Overage:     "N/A",
+		}
+	}
+
 	// Calculate the SLA deadline based on business hours, weekends, and holidays
 	slaDeadline, err := s.calculateSLADeadline()
 	if err != nil {
